@@ -1,137 +1,190 @@
-const canvas = document.querySelector('#editorCanvas');
+const $ = selector => document.querySelector(selector);
+const canvas = $('#editorCanvas');
 const ctx = canvas.getContext('2d');
-const shell = document.querySelector('#canvasShell');
-const photoInput = document.querySelector('#photoInput');
-const frameInput = document.querySelector('#frameInput');
-const emptyState = document.querySelector('#emptyState');
-const dragHint = document.querySelector('#dragHint');
-const zoomRange = document.querySelector('#zoomRange');
-const zoomValue = document.querySelector('#zoomValue');
-const resetButton = document.querySelector('#resetButton');
-const downloadButton = document.querySelector('#downloadButton');
-const defaultFrameButton = document.querySelector('#defaultFrameButton');
-const formatButtons = document.querySelectorAll('.format-button');
+const shell = $('#canvasShell');
+const photoInput = $('#photoInput');
+const emptyAction = $('#emptyAction');
+const downloadButton = $('#downloadButton');
+const resetButton = $('#resetButton');
+const photoControls = $('#photoControls');
+const zoomRange = $('#zoomRange');
+const zoomValue = $('#zoomValue');
+const frameName = $('#frameName');
+const frameDots = $('#frameDots');
+const toastElement = $('#toast');
 
+const basePath = 'imagens_modelo_29-08-2026/';
 const formats = {
-  feed: { src: 'assets/moldura-julio-cesar.png', width: 1080, height: 1080, filename: 'adesivo-julio-cesar-555.png' },
-  story: { src: 'modelo_stories.png', width: 1080, height: 1920, filename: 'to-com-julio-cesar-555-story.png' }
+  story: { width: 1080, height: 1920, filename: 'story-julio-cesar-555.png', frames: ['JC__Moldura 1.png', 'JC__Moldura 2.png', 'JC__Moldura 3.png', 'JC__Moldura 4.png', 'JC__Moldura 5.png'] },
+  avatar: { width: 1080, height: 1080, filename: 'avatar-julio-cesar-555.png', frames: ['12.png', '13.png', '14.png'] }
 };
+const state = { format: 'story', indexes: { story: 0, avatar: 0 }, frames: new Map(), frame: null, photo: null, baseScale: 1, zoom: 1, x: 0, y: 0, dragging: false };
+const config = () => formats[state.format];
+const index = () => state.indexes[state.format];
 
-const state = { photo: null, frame: null, format: 'feed', baseScale: 1, zoom: 1, x: 0, y: 0, dragging: false, pointerX: 0, pointerY: 0 };
-
-function buildDefaultFrame() {
-  const frame = document.createElement('canvas');
-  frame.width = frame.height = 1080;
-  const f = frame.getContext('2d');
-  f.fillStyle = '#082d59'; f.fillRect(0, 0, 1080, 190);
-  f.fillStyle = '#ffd52e'; f.fillRect(0, 190, 1080, 22); f.fillRect(0, 920, 1080, 160);
-  f.beginPath(); f.moveTo(0, 0); f.lineTo(180, 0); f.lineTo(0, 180); f.closePath(); f.fillStyle = '#27a6df'; f.fill();
-  f.textAlign = 'center'; f.fillStyle = '#ffffff'; f.font = '900 76px Arial'; f.fillText('EU APOIO ESSA IDEIA!', 540, 105);
-  f.font = '600 28px Arial'; f.fillStyle = '#b8ddf4'; f.fillText('JUNTOS POR UM NOVO CAMINHO', 540, 155);
-  f.fillStyle = '#082d59'; f.textAlign = 'left'; f.font = '900 58px Arial'; f.fillText('ANTÔNIO SILVA', 62, 1000);
-  f.font = '700 25px Arial'; f.fillText('DEPUTADO • 2026', 65, 1040);
-  f.textAlign = 'right'; f.font = '900 80px Arial'; f.fillText('12345', 1015, 1020);
-  return frame;
+function toast(message) {
+  toastElement.textContent = message;
+  toastElement.classList.add('show');
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => toastElement.classList.remove('show'), 2400);
 }
 
-function loadDefaultFrame() {
-  const format = formats[state.format];
-  canvas.width = format.width;
-  canvas.height = format.height;
-  shell.dataset.format = state.format;
-  shell.style.aspectRatio = `${format.width} / ${format.height}`;
-  const image = new Image();
-  image.onload = () => { state.frame = image; state.photo ? resetPosition() : draw(); };
-  image.onerror = () => { state.frame = buildDefaultFrame(); draw(); };
-  image.src = format.src;
+function loadImage(source) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = source;
+  });
 }
 
-loadDefaultFrame();
+async function selectFrame(nextIndex) {
+  state.indexes[state.format] = (nextIndex + config().frames.length) % config().frames.length;
+  const source = encodeURI(basePath + config().frames[index()]);
+  try {
+    if (!state.frames.has(source)) state.frames.set(source, await loadImage(source));
+    state.frame = state.frames.get(source);
+    frameName.textContent = `Moldura ${index() + 1} de ${config().frames.length}`;
+    renderDots();
+    draw();
+  } catch (error) {
+    console.error(error);
+    toast('Não foi possível carregar esta moldura.');
+  }
+}
+
+function renderDots() {
+  frameDots.replaceChildren();
+  config().frames.forEach((_, dotIndex) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `dot${dotIndex === index() ? ' active' : ''}`;
+    button.setAttribute('aria-label', `Moldura ${dotIndex + 1}`);
+    button.addEventListener('click', () => selectFrame(dotIndex));
+    frameDots.append(button);
+  });
+}
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.save();
-  if (state.format === 'feed') {
-    ctx.beginPath();
-    ctx.arc(canvas.width / 2, canvas.height / 2, canvas.width / 2, 0, Math.PI * 2);
-    ctx.clip();
-  }
-  ctx.fillStyle = '#e6ebef'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#dceaf3';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   if (state.photo) {
     const scale = state.baseScale * state.zoom;
-    const width = state.photo.width * scale;
-    const height = state.photo.height * scale;
+    const width = state.photo.naturalWidth * scale;
+    const height = state.photo.naturalHeight * scale;
     ctx.drawImage(state.photo, state.x - width / 2, state.y - height / 2, width, height);
   }
   if (state.frame) ctx.drawImage(state.frame, 0, 0, canvas.width, canvas.height);
-  ctx.restore();
-}
-
-function loadImage(file, callback) {
-  if (!file) return;
-  const url = URL.createObjectURL(file);
-  const image = new Image();
-  image.onload = () => { callback(image); URL.revokeObjectURL(url); };
-  image.onerror = () => { URL.revokeObjectURL(url); alert('Não foi possível abrir esta imagem. Tente outro arquivo.'); };
-  image.src = url;
 }
 
 function resetPosition() {
   if (!state.photo) return;
-  state.baseScale = Math.max(canvas.width / state.photo.width, canvas.height / state.photo.height);
-  state.zoom = 1; state.x = canvas.width / 2; state.y = canvas.height / 2;
-  zoomRange.value = 100; zoomValue.value = '100%'; draw();
+  state.baseScale = Math.max(canvas.width / state.photo.naturalWidth, canvas.height / state.photo.naturalHeight);
+  state.zoom = 1;
+  state.x = canvas.width / 2;
+  state.y = canvas.height / 2;
+  zoomRange.value = 100;
+  zoomValue.value = '100%';
+  draw();
 }
 
-photoInput.addEventListener('change', event => loadImage(event.target.files[0], image => {
-  state.photo = image; resetPosition(); emptyState.hidden = true; dragHint.hidden = false;
-  zoomRange.disabled = resetButton.disabled = downloadButton.disabled = false;
-}));
-
-frameInput.addEventListener('change', event => loadImage(event.target.files[0], image => {
-  state.frame = image;
-  canvas.width = image.naturalWidth;
-  canvas.height = image.naturalHeight;
-  shell.style.aspectRatio = `${image.naturalWidth} / ${image.naturalHeight}`;
+function configureCanvas() {
+  canvas.width = config().width;
+  canvas.height = config().height;
+  shell.dataset.format = state.format;
   state.photo ? resetPosition() : draw();
+}
+
+function openPhotoPicker() { photoInput.value = ''; photoInput.click(); }
+emptyAction.addEventListener('click', openPhotoPicker);
+$('#photoButton').addEventListener('click', openPhotoPicker);
+resetButton.addEventListener('click', resetPosition);
+$('#previousFrame').addEventListener('click', () => selectFrame(index() - 1));
+$('#nextFrame').addEventListener('click', () => selectFrame(index() + 1));
+
+photoInput.addEventListener('change', () => {
+  const file = photoInput.files?.[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  loadImage(url).then(image => {
+    state.photo = image;
+    resetPosition();
+    emptyAction.hidden = true;
+    photoControls.hidden = false;
+    resetButton.hidden = false;
+    downloadButton.disabled = false;
+    $('#photoButton').textContent = 'Trocar foto';
+    URL.revokeObjectURL(url);
+  }).catch(() => { URL.revokeObjectURL(url); toast('Não foi possível abrir essa foto.'); });
+});
+
+document.querySelectorAll('.format-tab').forEach(tab => tab.addEventListener('click', () => {
+  state.format = tab.dataset.format;
+  document.querySelectorAll('.format-tab').forEach(item => {
+    const active = item === tab;
+    item.classList.toggle('active', active);
+    item.setAttribute('aria-pressed', String(active));
+  });
+  state.frame = null;
+  configureCanvas();
+  selectFrame(index());
 }));
 
-defaultFrameButton.addEventListener('click', () => { frameInput.value = ''; loadDefaultFrame(); });
-formatButtons.forEach(button => button.addEventListener('click', () => {
-  state.format = button.dataset.format;
-  formatButtons.forEach(item => {
-    const selected = item === button;
-    item.classList.toggle('selected', selected);
-    item.setAttribute('aria-pressed', String(selected));
-  });
-  frameInput.value = '';
-  loadDefaultFrame();
-}));
-zoomRange.addEventListener('input', () => { state.zoom = Number(zoomRange.value) / 100; zoomValue.value = `${zoomRange.value}%`; draw(); });
-resetButton.addEventListener('click', resetPosition);
+zoomRange.addEventListener('input', () => {
+  state.zoom = Number(zoomRange.value) / 100;
+  zoomValue.value = `${zoomRange.value}%`;
+  draw();
+});
 
 function pointerPosition(event) {
   const rect = canvas.getBoundingClientRect();
   return { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height };
 }
-
 canvas.addEventListener('pointerdown', event => {
   if (!state.photo) return;
-  state.dragging = true; canvas.classList.add('dragging'); canvas.setPointerCapture(event.pointerId);
-  const point = pointerPosition(event); state.pointerX = point.x; state.pointerY = point.y;
+  state.dragging = true;
+  canvas.classList.add('dragging');
+  canvas.setPointerCapture(event.pointerId);
+  const point = pointerPosition(event);
+  state.pointerX = point.x;
+  state.pointerY = point.y;
 });
 canvas.addEventListener('pointermove', event => {
   if (!state.dragging) return;
-  const point = pointerPosition(event); state.x += point.x - state.pointerX; state.y += point.y - state.pointerY;
-  state.pointerX = point.x; state.pointerY = point.y; draw();
+  const point = pointerPosition(event);
+  state.x += point.x - state.pointerX;
+  state.y += point.y - state.pointerY;
+  state.pointerX = point.x;
+  state.pointerY = point.y;
+  draw();
 });
 function releasePointer() { state.dragging = false; canvas.classList.remove('dragging'); }
-canvas.addEventListener('pointerup', releasePointer); canvas.addEventListener('pointercancel', releasePointer);
+canvas.addEventListener('pointerup', releasePointer);
+canvas.addEventListener('pointercancel', releasePointer);
 
 downloadButton.addEventListener('click', () => {
+  if (!state.photo) return openPhotoPicker();
   draw();
-  const link = document.createElement('a');
-  link.download = formats[state.format].filename; link.href = canvas.toDataURL('image/png'); link.click();
+  canvas.toBlob(blob => {
+    if (!blob) return toast('Não foi possível gerar a imagem.');
+    const file = new File([blob], config().filename, { type: 'image/png' });
+    if (navigator.canShare?.({ files: [file] })) {
+      navigator.share({ files: [file], title: 'Tô com Júlio César 555' }).catch(error => {
+        if (error.name !== 'AbortError') downloadBlob(blob);
+      });
+    } else downloadBlob(blob);
+  }, 'image/png');
 });
 
-draw();
+function downloadBlob(blob) {
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = config().filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 3000);
+  toast('Imagem pronta!');
+}
+
+configureCanvas();
+selectFrame(0);
