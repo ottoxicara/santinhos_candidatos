@@ -13,12 +13,31 @@ const frameName = $('#frameName');
 const frameDots = $('#frameDots');
 const toastElement = $('#toast');
 
-const basePath = 'imagens_modelo_29-08-2026/';
 const formats = {
-  story: { width: 1080, height: 1920, filename: 'story-julio-cesar-555.png', frames: ['JC__Moldura 1.png', 'JC__Moldura 2.png', 'JC__Moldura 3.png', 'JC__Moldura 4.png', 'JC__Moldura 5.png'] },
-  avatar: { width: 1080, height: 1080, filename: 'avatar-julio-cesar-555.png', frames: ['12.png', '13.png', '14.png'] }
+  story: {
+    filename: 'story-julio-cesar-555.png',
+    frames: [
+      { path: 'imagens_modelo_29-08-2026/JC__Moldura 1.png', width: 1080, height: 1920 },
+      { path: 'imagens_modelo_29-08-2026/JC__Moldura 2.png', width: 1080, height: 1920 },
+      { path: 'imagens_modelo_29-08-2026/JC__Moldura 3.png', width: 1080, height: 1920 },
+      { path: 'imagens_modelo_29-08-2026/JC__Moldura 4.png', width: 1080, height: 1920 },
+      { path: 'imagens_modelo_29-08-2026/JC__Moldura 5.png', width: 1080, height: 1870 },
+      { path: 'Moldura-Vereadora-JC_Story.png', width: 1080, height: 1920 },
+      { path: 'Moldura-Vereador-JC_Story.png', width: 1080, height: 1920 }
+    ]
+  },
+  feed: {
+    filename: 'feed-julio-cesar-555.png',
+    frames: [
+      { path: 'imagens_modelo_29-08-2026/12.png', width: 1080, height: 1080 },
+      { path: 'imagens_modelo_29-08-2026/13.png', width: 1080, height: 1080 },
+      { path: 'imagens_modelo_29-08-2026/14.png', width: 1080, height: 1080 },
+      { path: 'Moldura-Vereadora-JC_Feed.png', width: 1080, height: 1350 },
+      { path: 'Moldura-Vereador-JC_Feed.png', width: 1080, height: 1350 }
+    ]
+  }
 };
-const state = { format: 'story', indexes: { story: 0, avatar: 0 }, frames: new Map(), frame: null, photo: null, baseScale: 1, zoom: 1, x: 0, y: 0, dragging: false };
+const state = { format: 'story', indexes: { story: 0, feed: 0 }, frames: new Map(), frame: null, photo: null, baseScale: 1, zoom: 1, x: 0, y: 0, dragging: false };
 const config = () => formats[state.format];
 const index = () => state.indexes[state.format];
 
@@ -40,10 +59,12 @@ function loadImage(source) {
 
 async function selectFrame(nextIndex) {
   state.indexes[state.format] = (nextIndex + config().frames.length) % config().frames.length;
-  const source = encodeURI(basePath + config().frames[index()]);
+  const selectedFrame = config().frames[index()];
+  const source = encodeURI(selectedFrame.path);
   try {
     if (!state.frames.has(source)) state.frames.set(source, await loadImage(source));
     state.frame = state.frames.get(source);
+    configureCanvas(selectedFrame);
     frameName.textContent = `Moldura ${index() + 1} de ${config().frames.length}`;
     renderDots();
     draw();
@@ -89,10 +110,11 @@ function resetPosition() {
   draw();
 }
 
-function configureCanvas() {
-  canvas.width = config().width;
-  canvas.height = config().height;
+function configureCanvas(selectedFrame = config().frames[index()]) {
+  canvas.width = selectedFrame.width;
+  canvas.height = selectedFrame.height;
   shell.dataset.format = state.format;
+  shell.style.aspectRatio = `${selectedFrame.width} / ${selectedFrame.height}`;
   state.photo ? resetPosition() : draw();
 }
 
@@ -127,7 +149,6 @@ document.querySelectorAll('.format-tab').forEach(tab => tab.addEventListener('cl
     item.setAttribute('aria-pressed', String(active));
   });
   state.frame = null;
-  configureCanvas();
   selectFrame(index());
 }));
 
