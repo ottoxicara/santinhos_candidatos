@@ -24,8 +24,7 @@ const formats = {
       { path: 'imagens_modelo_29-08-2026/JC__Moldura 3.png', width: 1080, height: 1920 },
       { path: 'imagens_modelo_29-08-2026/JC__Moldura 4.png', width: 1080, height: 1920 },
       { path: 'imagens_modelo_29-08-2026/JC__Moldura 5.png', width: 1080, height: 1870 },
-      { path: 'Moldura-Vereadora-JC_Story.png', width: 1080, height: 1920 },
-      { path: 'Moldura-Vereador-JC_Story.png', width: 1080, height: 1920 }
+      { path: 'moldura story.png', width: 1080, height: 1920 }
     ]
   },
   feed: {
@@ -37,7 +36,8 @@ const formats = {
       { path: 'imagens_modelo_29-08-2026/13.png', width: 1080, height: 1080 },
       { path: 'imagens_modelo_29-08-2026/14.png', width: 1080, height: 1080 },
       { path: 'Moldura-Vereadora-JC_Feed.png', width: 1080, height: 1350 },
-      { path: 'Moldura-Vereador-JC_Feed.png', width: 1080, height: 1350 }
+      { path: 'Moldura-Vereador-JC_Feed.png', width: 1080, height: 1350 },
+      { path: 'moldura feed.png', width: 1080, height: 1080 }
     ]
   }
 };
